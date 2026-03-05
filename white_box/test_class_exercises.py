@@ -4,10 +4,16 @@
 White-box unit testing examples.
 """
 import unittest
+from io import StringIO
+from unittest.mock import patch
 
 from white_box.class_exercises import (
+    BankAccount,
+    BankingSystem,
     DocumentEditingSystem,
     ElevatorSystem,
+    Product,
+    ShoppingCart,
     TrafficLight,
     UserAuthentication,
     VendingMachine,
@@ -291,3 +297,258 @@ class TestElevatorSystem(unittest.TestCase):
         result = self.elevator.stop()
         self.assertEqual(result, "Invalid operation in current state")
         self.assertEqual(self.elevator.state, "Idle")
+
+
+class TestBankAccount(unittest.TestCase):
+    """
+    Tests for BankAccount
+    """
+
+    def test_init_sets_account_number(self):
+        """
+        Constructor correctly assigns account_number.
+        """
+        account = BankAccount("ACC001", 500)
+        self.assertEqual(account.account_number, "ACC001")
+
+    def test_init_sets_balance(self):
+        """Constructor correctly assigns balance."""
+        account = BankAccount("ACC001", 500)
+        self.assertEqual(account.balance, 500)
+
+    @patch("sys.stdout", new_callable=StringIO)
+    def test_view_account_prints_correctly(self, mock_stdout):
+        """
+        view_account prints account_number and balance.
+        """
+        account = BankAccount("ACC001", 500)
+        account.view_account()
+        output = mock_stdout.getvalue()
+        self.assertIn("ACC001", output)
+        self.assertIn("500", output)
+
+    @patch("sys.stdout", new_callable=StringIO)
+    def test_view_account_zero_balance(self, mock_stdout):
+        """
+        view_account prints correctly with zero balance
+        """
+        account = BankAccount("ACC002", 0)
+        account.view_account()
+        self.assertIn("0", mock_stdout.getvalue())
+
+
+class TestBankingSystem(unittest.TestCase):
+    """
+    Tests for BankingSystem
+    """
+
+    def setUp(self):
+        self.bs = BankingSystem()
+
+    def test_init_state(self):
+        """
+        Constructor sets users dict and empty logged_in_users set.
+        """
+        self.assertIn("user123", self.bs.users)
+        self.assertIsInstance(self.bs.logged_in_users, set)
+        self.assertEqual(len(self.bs.logged_in_users), 0)
+
+    @patch("sys.stdout", new_callable=StringIO)
+    def test_auth_unknown_user_returns_false(self, mock_stdout):
+        """
+        Unknown username -> Authentication failed, returns False.
+        """
+        self.assertFalse(self.bs.authenticate("unknown", "pass123"))
+        self.assertIn("Authentication failed.", mock_stdout.getvalue())
+
+    @patch("sys.stdout", new_callable=StringIO)
+    def test_auth_wrong_password_returns_false(self, mock_stdout):
+        """
+        Wrong password -> Authentication failed, returns False.
+        """
+        self.assertFalse(self.bs.authenticate("user123", "wrong"))
+        self.assertIn("Authentication failed.", mock_stdout.getvalue())
+
+    @patch("sys.stdout", new_callable=StringIO)
+    def test_auth_valid_credentials_returns_true(self, _mock_stdout):
+        """
+        Valid credentials -> added to logged_in_users, returns True.
+        """
+        self.assertTrue(self.bs.authenticate("user123", "pass123"))
+        self.assertIn("user123", self.bs.logged_in_users)
+
+    @patch("sys.stdout", new_callable=StringIO)
+    def test_auth_already_logged_in_returns_false(self, mock_stdout):
+        """
+        Already logged in -> prints message, returns False.
+        """
+        self.bs.logged_in_users.add("user123")
+        self.assertFalse(self.bs.authenticate("user123", "pass123"))
+        self.assertIn("User already logged in.", mock_stdout.getvalue())
+
+    @patch("sys.stdout", new_callable=StringIO)
+    def test_transfer_sender_not_authenticated(self, mock_stdout):
+        """
+        Sender not logged in -> returns False.
+        """
+        self.assertFalse(self.bs.transfer_money("ghost", "receiver", 100, "regular"))
+        self.assertIn("Sender not authenticated.", mock_stdout.getvalue())
+
+    @patch("sys.stdout", new_callable=StringIO)
+    def test_transfer_invalid_transaction_type(self, mock_stdout):
+        """
+        Unknown transaction type -> returns False.
+        """
+        self.bs.logged_in_users.add("user123")
+        self.assertFalse(self.bs.transfer_money("user123", "receiver", 100, "instant"))
+        self.assertIn("Invalid transaction type.", mock_stdout.getvalue())
+
+    @patch("sys.stdout", new_callable=StringIO)
+    def test_transfer_regular_sufficient_funds(self, _mock_stdout):
+        """
+        Regular transfer, funds OK (500 + 2% fee <= 1000) -> True.
+        """
+        self.bs.logged_in_users.add("user123")
+        self.assertTrue(self.bs.transfer_money("user123", "receiver", 500, "regular"))
+
+    @patch("sys.stdout", new_callable=StringIO)
+    def test_transfer_express_insufficient_funds(self, mock_stdout):
+        """
+        Express transfer, funds exceeded (1000 + 5% fee > 1000) -> False.
+        """
+        self.bs.logged_in_users.add("user123")
+        self.assertFalse(self.bs.transfer_money("user123", "receiver", 1000, "express"))
+        self.assertIn("Insufficient funds.", mock_stdout.getvalue())
+
+    @patch("sys.stdout", new_callable=StringIO)
+    def test_transfer_scheduled_sufficient_funds(self, _mock_stdout):
+        """
+        Scheduled transfer, funds OK (500 + 1% fee <= 1000) -> True.
+        """
+        self.bs.logged_in_users.add("user123")
+        self.assertTrue(self.bs.transfer_money("user123", "receiver", 500, "scheduled"))
+
+
+class TestProduct(unittest.TestCase):
+    """
+    Tests for Product
+    """
+
+    def test_init_sets_name_and_price(self):
+        """
+        Constructor assigns name and price.
+        """
+        p = Product("Apple", 1.5)
+        self.assertEqual(p.name, "Apple")
+        self.assertEqual(p.price, 1.5)
+
+    def test_init_zero_price(self):
+        """
+        Constructor accepts zero price.
+        """
+        self.assertEqual(Product("Free", 0).price, 0)
+
+    @patch("sys.stdout", new_callable=StringIO)
+    def test_view_product_prints_and_returns_message(self, mock_stdout):
+        """
+        view_product prints name/price and returns the message string.
+        """
+        p = Product("Apple", 1.5)
+        msg = p.view_product()
+        self.assertIn("Apple", mock_stdout.getvalue())
+        self.assertIn("1.5", msg)
+
+
+class TestShoppingCart(unittest.TestCase):
+    """
+    Tests for ShoppingCart
+    """
+
+    def setUp(self):
+        self.cart = ShoppingCart()
+        self.p1 = Product("Apple", 2.0)
+        self.p2 = Product("Banana", 1.0)
+
+    def test_init_empty_items(self):
+        """Constructor initializes an empty items list."""
+        self.assertEqual(self.cart.items, [])
+
+    def test_add_new_product_appends(self):
+        """
+        Adding a new product appends it with given quantity.
+        """
+        self.cart.add_product(self.p1, 3)
+        self.assertEqual(len(self.cart.items), 1)
+        self.assertEqual(self.cart.items[0]["quantity"], 3)
+
+    def test_add_existing_product_increments_quantity(self):
+        """
+        Adding an existing product updates quantity without duplicating.
+        """
+        self.cart.add_product(self.p1, 2)
+        self.cart.add_product(self.p1, 3)
+        self.assertEqual(len(self.cart.items), 1)
+        self.assertEqual(self.cart.items[0]["quantity"], 5)
+
+    def test_remove_product_decrements_quantity(self):
+        """
+        Removing fewer units than available decrements quantity.
+        """
+        self.cart.add_product(self.p1, 5)
+        self.cart.remove_product(self.p1, 2)
+        self.assertEqual(self.cart.items[0]["quantity"], 3)
+
+    def test_remove_product_exact_quantity_removes_item(self):
+        """
+        Removing exact quantity eliminates the item from the list.
+        """
+        self.cart.add_product(self.p1, 3)
+        self.cart.remove_product(self.p1, 3)
+        self.assertEqual(len(self.cart.items), 0)
+
+    def test_remove_product_exceeding_quantity_removes_item(self):
+        """
+        Removing more than available also eliminates the item.
+        """
+        self.cart.add_product(self.p1, 2)
+        self.cart.remove_product(self.p1, 10)
+        self.assertEqual(len(self.cart.items), 0)
+
+    def test_remove_product_not_in_cart_does_nothing(self):
+        """
+        Removing a product that isn't in the cart leaves it unchanged.
+        """
+        self.cart.add_product(self.p1, 3)
+        self.cart.remove_product(self.p2, 1)
+        self.assertEqual(len(self.cart.items), 1)
+
+    @patch("sys.stdout", new_callable=StringIO)
+    def test_view_cart_empty_produces_no_output(self, mock_stdout):
+        """
+        view_cart on empty cart prints nothing.
+        """
+        self.cart.view_cart()
+        self.assertEqual(mock_stdout.getvalue(), "")
+
+    @patch("sys.stdout", new_callable=StringIO)
+    def test_view_cart_shows_item_details(self, mock_stdout):
+        """
+        view_cart prints product name and computed price.
+        """
+        self.cart.add_product(self.p1, 3)
+        self.cart.view_cart()
+        output = mock_stdout.getvalue()
+        self.assertIn("Apple", output)
+        self.assertIn("6.0", output)
+
+    @patch("sys.stdout", new_callable=StringIO)
+    def test_checkout_computes_correct_total(self, mock_stdout):
+        """
+        checkout sums all items and prints completion message.
+        """
+        self.cart.add_product(self.p1, 2)
+        self.cart.add_product(self.p2, 4)
+        self.cart.checkout()
+        output = mock_stdout.getvalue()
+        self.assertIn("8.0", output)
+        self.assertIn("Checkout completed", output)
