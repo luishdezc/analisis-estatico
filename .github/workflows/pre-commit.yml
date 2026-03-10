@@ -10,4 +10,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
+      - name: Install dependencies
+        run: pip install requests
       - uses: pre-commit/action@v3.0.0
